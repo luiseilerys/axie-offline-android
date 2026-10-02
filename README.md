@@ -1,53 +1,39 @@
 # Axie Offline Android
 
-Juego de criaturas coleccionables **100% offline** para Android 5.0+ (API 21), escrito en **Java nativo** con `SurfaceView` + `Canvas`. Inspirado en las mecánicas de **Axie Infinity Classic** y **Axie Infinity: Origins**, sin blockchain ni WebView.
+Juego de criaturas coleccionables **100% offline** para Android 5.0+ (API 21), escrito en **Java nativo** con `SurfaceView` + `Canvas`.
 
-## Características
+## Composición por partes
 
-- **9 clases** (Bestia, Planta, Reptil, Acuático, Pájaro, Bicho, Mech, Dawn, Dusk) con ciclo de ventajas/desventajas (+15% / -15%)
-- **6 partes corporales** con genes D / R1 / R2 y cartas asociadas
-- **Batallas por turnos** en modo Classic y Origins (energía, robo de cartas, Rage/Fury, Leaf, Bubble, etc.)
-- **Crianza genética** con probabilidades de herencia, límite 7 crianzas, mutaciones Mystic 7%, coste escalado
-- **Economía local** (Shards) + guardado en SharedPreferences
-- **Renderizado 2D** puro con Canvas/Paint (formas geométricas, sin imágenes externas)
+Cada criatura se construye superponiendo **7 capas PNG** (Espalda, Cola, Cuerpo, Boca, Cuerno, Orejas, Ojos) generadas por código con Pillow. Los genes dominantes de cada slot determinan la variante (12 por clase × 9 clases).
 
-## Requisitos
+```bash
+pip install Pillow
+python tools/generate_parts.py   # ~657 PNGs en app/src/main/res/drawable/
+```
 
-- minSdkVersion **21** (Android 5.0)
-- targetSdkVersion **34**
-- Sin permisos de Internet
+## Mecánicas
+
+- **9 clases** con ciclo RPS ±15% y bonus misma clase
+- **Genes D/R1/R2** por parte + pureza genética
+- **Batalla Classic / Origins**: energía, Rage/Fury, Leaf, Bubble, críticos, IA
+- **Crianza**: herencia 37.5%/9.375%/3.125%, límite 7, Mystic 7%, costes 900–15300
+- **Shards**, AXP, guardado local (SharedPreferences)
 
 ## Compilar APK
 
-El workflow de GitHub Actions se ejecuta en cada push a `main`:
+El workflow de Actions:
+1. Genera las partes con Python/Pillow
+2. Compila con Gradle (`assembleDebug`)
+3. Sube el artifact **axie-offline-debug**
 
-1. Abre la pestaña **Actions**
-2. Selecciona el workflow **Build APK** más reciente
-3. Descarga el artifact **axie-offline-debug**
-4. Instala el APK en tu dispositivo
-
-### Local
+https://github.com/luiseilerys/axie-offline-android/actions
 
 ```bash
-./gradlew assembleDebug
+python tools/generate_parts.py
+gradle assembleDebug
 ```
 
-APK: `app/build/outputs/apk/debug/app-debug.apk`
+## Requisitos
 
-## Estructura
-
-```
-app/src/main/java/com/axieoffline/
-  MainActivity.java
-  GameView.java
-  model/
-    Creature.java
-    BattleSystem.java
-    BreedingSystem.java
-    PlayerData.java
-    GameState.java
-```
-
-## Repositorio
-
-https://github.com/luiseilerys/axie-offline-android
+- minSdk **21** · targetSdk **34**
+- Sin Internet, sin blockchain, sin WebView

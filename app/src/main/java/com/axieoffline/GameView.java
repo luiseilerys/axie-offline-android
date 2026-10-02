@@ -13,6 +13,7 @@ import com.axieoffline.model.BattleSystem;
 import com.axieoffline.model.BreedingSystem;
 import com.axieoffline.model.Creature;
 import com.axieoffline.model.GameState;
+import com.axieoffline.model.PartComposer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,15 +25,13 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     private volatile boolean running;
     private final SurfaceHolder holder;
     private final GameState state;
+    private final PartComposer composer;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Random rng = new Random();
 
     private int W, H;
-    private float touchX, touchY;
-    private boolean touched;
 
-    // UI hit areas
     private final List<RectF> buttons = new ArrayList<>();
     private final List<String> buttonActions = new ArrayList<>();
     private final List<RectF> cardRects = new ArrayList<>();
@@ -43,6 +42,7 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         holder = getHolder();
         holder.addCallback(this);
         state = new GameState();
+        composer = new PartComposer(context);
         if (!state.player.load(context)) {
             state.player.initNewGame();
             state.player.save(context);
@@ -73,7 +73,7 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
 
     @Override
     public void run() {
-        long target = 16; // ~60fps
+        long target = 16;
         while (running) {
             long start = System.currentTimeMillis();
             if (holder.getSurface().isValid()) {
@@ -95,7 +95,6 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     }
 
     private void update() {
-        // Hatch eggs
         for (Creature c : state.player.creatures) {
             if (c.isEgg) BreedingSystem.tryHatch(c);
         }
@@ -136,26 +135,36 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     private void drawHome(Canvas canvas) {
         textPaint.setTextSize(dp(28));
         textPaint.setColor(0xFFE94560);
-        canvas.drawText("Axie Offline", W / 2f, H * 0.15f, textPaint);
-        textPaint.setTextSize(dp(14));
+        canvas.drawText("Axie Offline", W / 2f, H * 0.12f, textPaint);
+        textPaint.setTextSize(dp(13));
         textPaint.setColor(0xFFAAAAAA);
-        canvas.drawText("Classic + Origins mechanics", W / 2f, H * 0.2f, textPaint);
+        canvas.drawText("Composite creatures \u00b7 Classic + Origins", W / 2f, H * 0.17f, textPaint);
+
+        // Showcase first 3 creatures composed
+        float showY = H * 0.28f;
+        int n = Math.min(3, state.player.creatures.size());
+        for (int i = 0; i < n; i++) {
+            Creature c = state.player.creatures.get(i);
+            if (c.isEgg) continue;
+            float x = W * (0.25f + i * 0.25f);
+            composer.drawCreature(canvas, c, x, showY, dp(90));
+        }
 
         textPaint.setTextSize(dp(16));
         textPaint.setColor(0xFFFFD700);
-        canvas.drawText("Shards: " + state.player.shards, W / 2f, H * 0.28f, textPaint);
+        canvas.drawText("Shards: " + state.player.shards, W / 2f, H * 0.42f, textPaint);
 
-        float y = H * 0.38f;
-        addButton(canvas, "Battle", "battle", y); y += dp(56);
-        addButton(canvas, "Collection", "collection", y); y += dp(56);
-        addButton(canvas, "Breeding", "breed", y); y += dp(56);
+        float y = H * 0.48f;
+        addButton(canvas, "Battle", "battle", y); y += dp(52);
+        addButton(canvas, "Collection", "collection", y); y += dp(52);
+        addButton(canvas, "Breeding", "breed", y); y += dp(52);
         addButton(canvas, "New Game", "newgame", y);
     }
 
     private void addButton(Canvas canvas, String label, String action, float y) {
         float left = W * 0.15f;
         float right = W * 0.85f;
-        float h = dp(44);
+        float h = dp(42);
         RectF r = new RectF(left, y, right, y + h);
         paint.setColor(0xFF0F3460);
         paint.setStyle(Paint.Style.FILL);
@@ -165,7 +174,7 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         paint.setStrokeWidth(dp(2));
         canvas.drawRoundRect(r, dp(12), dp(12), paint);
         paint.setStyle(Paint.Style.FILL);
-        textPaint.setTextSize(dp(16));
+        textPaint.setTextSize(dp(15));
         textPaint.setColor(Color.WHITE);
         canvas.drawText(label, W / 2f, y + h * 0.65f, textPaint);
         buttons.add(r);
@@ -179,7 +188,7 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         addBackButton(canvas);
 
         float cardW = (W - dp(48)) / 2f;
-        float cardH = dp(100);
+        float cardH = dp(120);
         float x0 = dp(16);
         float y0 = dp(70);
         int i = 0;
@@ -189,17 +198,21 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
             RectF r = new RectF(x, y, x + cardW, y + cardH);
             paint.setColor(0xFF16213E);
             canvas.drawRoundRect(r, dp(10), dp(10), paint);
-            paint.setColor(c.getClassColor());
-            canvas.drawCircle(x + dp(28), y + dp(36), dp(18), paint);
-            textPaint.setTextAlign(Paint.Align.LEFT);
-            textPaint.setTextSize(dp(13));
-            textPaint.setColor(Color.WHITE);
-            canvas.drawText(c.isEgg ? "EGG" : c.name, x + dp(54), y + dp(28), textPaint);
-            textPaint.setTextSize(dp(11));
-            textPaint.setColor(0xFFAAAAAA);
-            canvas.drawText(c.axieClass.name() + " Lv" + c.level, x + dp(54), y + dp(46), textPaint);
-            canvas.drawText("HP " + c.maxHp + " SPD " + c.speed, x + dp(54), y + dp(62), textPaint);
-            textPaint.setTextAlign(Paint.Align.CENTER);
+            if (c.isEgg) {
+                paint.setColor(0xFFFBBF24);
+                canvas.drawOval(x + cardW / 2 - dp(20), y + dp(20), x + cardW / 2 + dp(20), y + dp(55), paint);
+                textPaint.setTextSize(dp(12));
+                textPaint.setColor(Color.WHITE);
+                canvas.drawText("EGG", x + cardW / 2, y + dp(75), textPaint);
+            } else {
+                composer.drawCreature(canvas, c, x + cardW / 2, y + dp(45), dp(70));
+                textPaint.setTextSize(dp(12));
+                textPaint.setColor(Color.WHITE);
+                canvas.drawText(c.name, x + cardW / 2, y + dp(90), textPaint);
+                textPaint.setTextSize(dp(10));
+                textPaint.setColor(0xFFAAAAAA);
+                canvas.drawText(c.axieClass.name() + " Lv" + c.level, x + cardW / 2, y + dp(106), textPaint);
+            }
             creatureRects.add(r);
             i++;
         }
@@ -223,25 +236,22 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         addBackButton(canvas);
 
         float cardW = (W - dp(48)) / 2f;
-        float cardH = dp(80);
+        float cardH = dp(100);
         float y0 = dp(60);
         int i = 0;
-        for (Creature c : state.player.creatures) {
-            if (c.isEgg) { i++; continue; }
+        List<Creature> selectable = new ArrayList<>();
+        for (Creature c : state.player.creatures) if (!c.isEgg) selectable.add(c);
+        for (Creature c : selectable) {
             float x = dp(16) + (i % 2) * (cardW + dp(16));
             float y = y0 + (i / 2) * (cardH + dp(10));
             RectF r = new RectF(x, y, x + cardW, y + cardH);
             boolean sel = state.selectedTeam.contains(c);
             paint.setColor(sel ? 0xFFE94560 : 0xFF16213E);
             canvas.drawRoundRect(r, dp(8), dp(8), paint);
-            paint.setColor(c.getClassColor());
-            canvas.drawCircle(x + dp(24), y + cardH / 2, dp(16), paint);
-            textPaint.setTextAlign(Paint.Align.LEFT);
-            textPaint.setTextSize(dp(12));
+            composer.drawCreature(canvas, c, x + cardW / 2, y + dp(40), dp(60));
+            textPaint.setTextSize(dp(11));
             textPaint.setColor(Color.WHITE);
-            canvas.drawText(c.name, x + dp(48), y + dp(30), textPaint);
-            canvas.drawText(c.axieClass.name(), x + dp(48), y + dp(48), textPaint);
-            textPaint.setTextAlign(Paint.Align.CENTER);
+            canvas.drawText(c.name, x + cardW / 2, y + dp(85), textPaint);
             creatureRects.add(r);
             i++;
         }
@@ -253,37 +263,32 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     private void drawBattle(Canvas canvas) {
         BattleSystem b = state.battle;
 
-        // Enemy side
-        float ey = dp(50);
+        float ey = dp(70);
         for (int i = 0; i < b.enemyTeam.size(); i++) {
             Creature c = b.enemyTeam.get(i);
             float x = W * (0.2f + i * 0.3f);
             drawUnit(canvas, c, x, ey, i == b.enemyActiveIdx);
         }
 
-        // Player side
-        float py = H * 0.38f;
+        float py = H * 0.36f;
         for (int i = 0; i < b.playerTeam.size(); i++) {
             Creature c = b.playerTeam.get(i);
             float x = W * (0.2f + i * 0.3f);
             drawUnit(canvas, c, x, py, i == b.playerActiveIdx);
         }
 
-        // Energy
         textPaint.setTextSize(dp(14));
         textPaint.setColor(0xFFFFD700);
-        canvas.drawText("Energy: " + b.playerEnergy + "  Round: " + b.round, W / 2f, H * 0.52f, textPaint);
+        canvas.drawText("Energy: " + b.playerEnergy + "  Round: " + b.round, W / 2f, H * 0.5f, textPaint);
 
-        // Phase UI
         if (b.phase == BattleSystem.Phase.CHOOSE_FIRST) {
-            addButton(canvas, "Go First", "first", H * 0.6f);
-            addButton(canvas, "Go Second", "second", H * 0.6f + dp(56));
+            addButton(canvas, "Go First", "first", H * 0.58f);
+            addButton(canvas, "Go Second", "second", H * 0.58f + dp(56));
         } else if (b.phase == BattleSystem.Phase.RPS) {
-            addButton(canvas, "Rock", "rps0", H * 0.58f);
-            addButton(canvas, "Paper", "rps1", H * 0.58f + dp(50));
-            addButton(canvas, "Scissors", "rps2", H * 0.58f + dp(100));
+            addButton(canvas, "Rock", "rps0", H * 0.56f);
+            addButton(canvas, "Paper", "rps1", H * 0.56f + dp(50));
+            addButton(canvas, "Scissors", "rps2", H * 0.56f + dp(100));
         } else if (b.phase == BattleSystem.Phase.PLAYER_TURN) {
-            // Cards
             float cardW = Math.min(dp(72), (W - dp(20)) / Math.max(1, b.playerHand.size()));
             float cardH = dp(90);
             float startX = (W - cardW * b.playerHand.size()) / 2f;
@@ -315,12 +320,11 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
             addButton(canvas, "Continue", "battle_done", H * 0.7f);
         }
 
-        // Log
         textPaint.setTextSize(dp(10));
         textPaint.setColor(0xFFCCCCCC);
         textPaint.setTextAlign(Paint.Align.LEFT);
-        float ly = H * 0.55f;
-        int start = Math.max(0, b.log.size() - 4);
+        float ly = H * 0.52f;
+        int start = Math.max(0, b.log.size() - 3);
         for (int i = start; i < b.log.size(); i++) {
             canvas.drawText(b.log.get(i), dp(8), ly, textPaint);
             ly += dp(14);
@@ -329,21 +333,24 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     }
 
     private void drawUnit(Canvas canvas, Creature c, float x, float y, boolean active) {
-        float r = dp(28);
-        paint.setColor(c.isAlive() ? c.getClassColor() : 0xFF444444);
-        canvas.drawCircle(x, y, r, paint);
+        float size = dp(72);
+        if (c.isAlive()) {
+            composer.drawCreature(canvas, c, x, y, size);
+        } else {
+            paint.setColor(0xFF444444);
+            canvas.drawCircle(x, y, size * 0.35f, paint);
+        }
         if (active && c.isAlive()) {
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(dp(3));
             paint.setColor(0xFFE94560);
-            canvas.drawCircle(x, y, r + dp(4), paint);
+            canvas.drawCircle(x, y, size * 0.42f, paint);
             paint.setStyle(Paint.Style.FILL);
         }
-        // HP bar
         float barW = dp(60);
         float barH = dp(6);
         float bx = x - barW / 2;
-        float by = y + r + dp(6);
+        float by = y + size * 0.42f;
         paint.setColor(0xFF333333);
         canvas.drawRect(bx, by, bx + barW, by + barH, paint);
         float pct = c.getBattleMaxHp() > 0 ? Math.max(0, (float) c.currentHp / c.getBattleMaxHp()) : 0;
@@ -351,14 +358,14 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         canvas.drawRect(bx, by, bx + barW * pct, by + barH, paint);
         textPaint.setTextSize(dp(10));
         textPaint.setColor(Color.WHITE);
-        canvas.drawText(c.name, x, y - r - dp(8), textPaint);
+        canvas.drawText(c.name, x, y - size * 0.45f, textPaint);
         if (c.currentShield > 0) {
             textPaint.setColor(0xFF60A5FA);
-            canvas.drawText("SH " + c.currentShield, x, by + dp(18), textPaint);
+            canvas.drawText("SH " + c.currentShield, x, by + dp(16), textPaint);
         }
         if (c.rage > 0) {
             textPaint.setColor(0xFFEF4444);
-            canvas.drawText("R" + c.rage, x + r + dp(8), y, textPaint);
+            canvas.drawText("R" + c.rage, x + size * 0.4f, y, textPaint);
         }
         if (c.furyForm) {
             textPaint.setColor(0xFFFF6B6B);
@@ -372,30 +379,27 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         canvas.drawText("Breeding", W / 2f, dp(40), textPaint);
         addBackButton(canvas);
 
-        textPaint.setTextSize(dp(12));
+        textPaint.setTextSize(dp(11));
         textPaint.setColor(0xFFAAAAAA);
-        canvas.drawText("Select 2 parents. Cost depends on breed count.", W / 2f, dp(60), textPaint);
+        canvas.drawText("Select 2 parents. Genes compose unique offspring.", W / 2f, dp(58), textPaint);
 
         float cardW = (W - dp(48)) / 2f;
-        float cardH = dp(70);
-        float y0 = dp(80);
+        float cardH = dp(90);
+        float y0 = dp(75);
         int i = 0;
-        for (Creature c : state.player.creatures) {
-            if (c.isEgg) continue;
+        List<Creature> selectable = new ArrayList<>();
+        for (Creature c : state.player.creatures) if (!c.isEgg) selectable.add(c);
+        for (Creature c : selectable) {
             float x = dp(16) + (i % 2) * (cardW + dp(16));
             float y = y0 + (i / 2) * (cardH + dp(8));
             RectF r = new RectF(x, y, x + cardW, y + cardH);
             boolean sel = c == state.breedA || c == state.breedB;
             paint.setColor(sel ? 0xFFE94560 : 0xFF16213E);
             canvas.drawRoundRect(r, dp(8), dp(8), paint);
-            paint.setColor(c.getClassColor());
-            canvas.drawCircle(x + dp(20), y + cardH / 2, dp(14), paint);
-            textPaint.setTextAlign(Paint.Align.LEFT);
-            textPaint.setTextSize(dp(11));
+            composer.drawCreature(canvas, c, x + cardW / 2, y + dp(38), dp(55));
+            textPaint.setTextSize(dp(10));
             textPaint.setColor(Color.WHITE);
-            canvas.drawText(c.name + " (B" + c.breedCount + ")", x + dp(42), y + dp(28), textPaint);
-            canvas.drawText(c.axieClass.name(), x + dp(42), y + dp(46), textPaint);
-            textPaint.setTextAlign(Paint.Align.CENTER);
+            canvas.drawText(c.name + " B" + c.breedCount, x + cardW / 2, y + dp(78), textPaint);
             creatureRects.add(r);
             i++;
         }
@@ -414,14 +418,15 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         Creature c = state.detailCreature;
         if (c == null) return;
         addBackButton(canvas);
-        paint.setColor(c.getClassColor());
-        canvas.drawCircle(W / 2f, H * 0.22f, dp(40), paint);
+        if (!c.isEgg) {
+            composer.drawCreature(canvas, c, W / 2f, H * 0.22f, dp(140));
+        }
         textPaint.setTextSize(dp(22));
         textPaint.setColor(Color.WHITE);
-        canvas.drawText(c.name, W / 2f, H * 0.35f, textPaint);
+        canvas.drawText(c.name, W / 2f, H * 0.4f, textPaint);
         textPaint.setTextSize(dp(14));
         textPaint.setColor(0xFFAAAAAA);
-        canvas.drawText(c.axieClass.name() + "  Level " + c.level, W / 2f, H * 0.4f, textPaint);
+        canvas.drawText(c.axieClass.name() + "  Level " + c.level, W / 2f, H * 0.45f, textPaint);
 
         String[] lines = {
                 "HP: " + c.maxHp,
@@ -432,7 +437,7 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
                 "Purity: " + String.format("%.0f%%", c.getPurity() * 100),
                 "AXP: " + c.axp
         };
-        float y = H * 0.48f;
+        float y = H * 0.52f;
         textPaint.setTextSize(dp(14));
         textPaint.setColor(Color.WHITE);
         for (String line : lines) {
@@ -444,16 +449,13 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
-            touchX = event.getX();
-            touchY = event.getY();
-            handleTouch(touchX, touchY);
+            handleTouch(event.getX(), event.getY());
             return true;
         }
         return super.onTouchEvent(event);
     }
 
     private void handleTouch(float x, float y) {
-        // Buttons
         for (int i = 0; i < buttons.size(); i++) {
             if (buttons.get(i).contains(x, y)) {
                 onAction(buttonActions.get(i));
@@ -480,11 +482,8 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
             for (RectF r : creatureRects) {
                 if (r.contains(x, y) && idx < selectable.size()) {
                     Creature c = selectable.get(idx);
-                    if (state.selectedTeam.contains(c)) {
-                        state.selectedTeam.remove(c);
-                    } else if (state.selectedTeam.size() < 3) {
-                        state.selectedTeam.add(c);
-                    }
+                    if (state.selectedTeam.contains(c)) state.selectedTeam.remove(c);
+                    else if (state.selectedTeam.size() < 3) state.selectedTeam.add(c);
                     return;
                 }
                 idx++;
@@ -538,6 +537,7 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
             case "newgame":
                 state.player.initNewGame();
                 state.player.save(getContext());
+                PartComposer.clearCache();
                 state.showMessage("New game started", 1500);
                 break;
             case "start_origins":
@@ -592,6 +592,7 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
                         if (child != null) {
                             state.player.creatures.add(child);
                             state.player.save(getContext());
+                            PartComposer.clearCache();
                             state.showMessage("Egg created! Hatches in 30s", 2000);
                             state.breedA = null;
                             state.breedB = null;

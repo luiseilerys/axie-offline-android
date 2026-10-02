@@ -18,6 +18,17 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Pillow
+        run: pip install Pillow
+
+      - name: Generate body-part PNGs
+        run: python tools/generate_parts.py
+
       - name: Accept Android licenses & install packages
         run: |
           export ANDROID_HOME=${ANDROID_HOME:-$ANDROID_SDK_ROOT}

@@ -18,15 +18,17 @@ public class Creature {
         public String partId;
         public AxieClass partClass;
         public String name;
+        public int variant;
 
-        public Gene(String partId, AxieClass partClass, String name) {
+        public Gene(String partId, AxieClass partClass, String name, int variant) {
             this.partId = partId;
             this.partClass = partClass;
             this.name = name;
+            this.variant = variant;
         }
 
         public Gene copy() {
-            return new Gene(partId, partClass, name);
+            return new Gene(partId, partClass, name, variant);
         }
     }
 
@@ -89,7 +91,7 @@ public class Creature {
     public int breedCount;
     public int axp;
     public int ascension;
-    public PartGenes[] genes; // 6 parts
+    public PartGenes[] genes;
     public List<Card> cards;
     public String parent1Uid;
     public String parent2Uid;
@@ -97,7 +99,6 @@ public class Creature {
     public boolean isEgg;
     public long eggMatureTime;
 
-    // Battle state
     public int currentHp;
     public int currentShield;
     public int rage;
@@ -133,55 +134,38 @@ public class Creature {
     }
 
     private static void applyClassBonuses(Creature c) {
-        // Base stats
         c.maxHp = 30;
         c.speed = 30;
         c.skill = 30;
         c.morale = 30;
 
         switch (c.axieClass) {
-            case PLANT:
-                c.maxHp += 3; c.morale += 1;
-                break;
-            case AQUATIC:
-                c.speed += 3; c.maxHp += 1;
-                break;
-            case BEAST:
-                c.maxHp += 1; c.skill += 3;
-                break;
-            case BIRD:
-                c.speed += 3; c.morale += 1;
-                break;
-            case BUG:
-                c.skill += 3; c.morale += 1;
-                break;
-            case REPTILE:
-                c.maxHp += 3; c.skill += 1;
-                break;
-            case MECH:
-                c.skill += 2; c.speed += 2;
-                break;
-            case DAWN:
-                c.morale += 3; c.speed += 1;
-                break;
-            case DUSK:
-                c.maxHp += 2; c.morale += 2;
-                break;
+            case PLANT: c.maxHp += 3; c.morale += 1; break;
+            case AQUATIC: c.speed += 3; c.maxHp += 1; break;
+            case BEAST: c.maxHp += 1; c.skill += 3; break;
+            case BIRD: c.speed += 3; c.morale += 1; break;
+            case BUG: c.skill += 3; c.morale += 1; break;
+            case REPTILE: c.maxHp += 3; c.skill += 1; break;
+            case MECH: c.skill += 2; c.speed += 2; break;
+            case DAWN: c.morale += 3; c.speed += 1; break;
+            case DUSK: c.maxHp += 2; c.morale += 2; break;
         }
         c.hp = c.maxHp;
     }
 
-    private static final String[] PART_NAMES = {
-            "Clear", "Cute", "Horn", "Cute", "Spiky", "Tail"
-    };
+    private static final String[] SLOT_NAMES = {"eyes", "ears", "horn", "mouth", "back", "tail"};
 
     private static void generateDefaultGenes(Creature c) {
         BodyPart[] parts = BodyPart.values();
+        String cls = c.axieClass.name().toLowerCase();
         for (int i = 0; i < 6; i++) {
-            Gene d = new Gene(c.axieClass.name().toLowerCase() + "_" + parts[i].name().toLowerCase(),
-                    c.axieClass, PART_NAMES[i] + " " + parts[i].name());
-            Gene r1 = new Gene("rec1_" + i, randomClass(), "Rec1");
-            Gene r2 = new Gene("rec2_" + i, randomClass(), "Rec2");
+            int v = RNG.nextInt(12);
+            int v1 = RNG.nextInt(12);
+            int v2 = RNG.nextInt(12);
+            String slot = SLOT_NAMES[i];
+            Gene d = new Gene(slot + "_" + cls + "_" + v, c.axieClass, slot + v, v);
+            Gene r1 = new Gene(slot + "_" + randomClassName() + "_" + v1, randomClass(), "rec1", v1);
+            Gene r2 = new Gene(slot + "_" + randomClassName() + "_" + v2, randomClass(), "rec2", v2);
             c.genes[i] = new PartGenes(d, r1, r2);
         }
     }
@@ -191,9 +175,12 @@ public class Creature {
         return vals[RNG.nextInt(vals.length)];
     }
 
+    private static String randomClassName() {
+        return randomClass().name().toLowerCase();
+    }
+
     private static void generateCards(Creature c) {
         c.cards.clear();
-        // Horn, Mouth, Back, Tail are main cards; Eyes, Ears also give cards (Origins)
         c.cards.add(makeCard("horn_atk", "Horn Strike", BodyPart.HORN, c.axieClass, 1, 60, 0, "attack"));
         c.cards.add(makeCard("mouth_bite", "Bite", BodyPart.MOUTH, c.axieClass, 1, 40, 0, "attack"));
         c.cards.add(makeCard("back_shell", "Shell", BodyPart.BACK, c.axieClass, 1, 0, 50, "shield"));
@@ -201,10 +188,9 @@ public class Creature {
         c.cards.add(makeCard("eyes_focus", "Focus", BodyPart.EYES, c.axieClass, 0, 0, 0, "draw"));
         c.cards.add(makeCard("ears_listen", "Listen", BodyPart.EARS, c.axieClass, 1, 0, 30, "shield"));
 
-        // Class-specific effect cards
         switch (c.axieClass) {
             case PLANT:
-                c.cards.add(makeCard("leaf_heal", "Photosynthesis", BodyPart.BACK, c.axieClass, 1, 0, 0, "leaf"));
+                c.cards.add(makeCard("leaf_heal", "Photo", BodyPart.BACK, c.axieClass, 1, 0, 0, "leaf"));
                 break;
             case BEAST:
                 c.cards.add(makeCard("rage_roar", "Roar", BodyPart.MOUTH, c.axieClass, 1, 30, 0, "rage"));
@@ -256,7 +242,6 @@ public class Creature {
     }
 
     public static boolean isStrongAgainst(AxieClass attacker, AxieClass defender) {
-        // 3 groups cycle: Plant/Reptile/Dusk strong vs Aquatic/Bird/Dawn strong vs Beast/Bug/Mech strong vs Plant/Reptile/Dusk
         int a = groupOf(attacker);
         int d = groupOf(defender);
         return (a + 1) % 3 == d;
@@ -278,7 +263,7 @@ public class Creature {
             case BIRD:
             case DAWN:
                 return 1;
-            default: // BEAST, BUG, MECH
+            default:
                 return 2;
         }
     }
