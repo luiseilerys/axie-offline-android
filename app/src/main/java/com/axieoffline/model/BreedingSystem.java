@@ -5,9 +5,8 @@ import java.util.Random;
 public class BreedingSystem {
 
     private static final Random RNG = new Random();
-
-    // Cost per breed count of the parent (sum of both parents' costs)
     private static final int[] BREED_COSTS = {900, 1350, 2250, 3600, 5850, 9450, 15300};
+    private static final String[] SLOT_NAMES = {"eyes", "ears", "horn", "mouth", "back", "tail"};
 
     public static int getBreedCost(Creature a, Creature b) {
         int costA = a.breedCount < 7 ? BREED_COSTS[a.breedCount] : Integer.MAX_VALUE;
@@ -20,9 +19,7 @@ public class BreedingSystem {
         if (a.uid.equals(b.uid)) return false;
         if (a.breedCount >= 7 || b.breedCount >= 7) return false;
         if (a.isEgg || b.isEgg) return false;
-        // No siblings (same litter)
         if (a.litterId != null && a.litterId.equals(b.litterId)) return false;
-        // No parent-child
         if (a.uid.equals(b.parent1Uid) || a.uid.equals(b.parent2Uid)) return false;
         if (b.uid.equals(a.parent1Uid) || b.uid.equals(a.parent2Uid)) return false;
         return true;
@@ -39,40 +36,37 @@ public class BreedingSystem {
         child.level = 1;
         child.breedCount = 0;
         child.isEgg = true;
-        // 5 days in ms (for offline we use short time for playability: 30 seconds)
         child.eggMatureTime = System.currentTimeMillis() + 30_000L;
 
-        // Class: random from parents
         child.axieClass = RNG.nextBoolean() ? parentA.axieClass : parentB.axieClass;
         child.name = child.axieClass.name() + " Offspring";
 
-        // Inherit genes for each part
         child.genes = new Creature.PartGenes[6];
         for (int i = 0; i < 6; i++) {
             Creature.Gene d = inheritGene(parentA.genes[i], parentB.genes[i]);
             Creature.Gene r1 = inheritGene(parentA.genes[i], parentB.genes[i]);
             Creature.Gene r2 = inheritGene(parentA.genes[i], parentB.genes[i]);
-            // 7% mystic mutation per part (Origins)
+            // 7% mystic mutation — still uses a visible variant of the class
             if (RNG.nextFloat() < 0.07f) {
-                d = new Creature.Gene("mystic_" + i, d.partClass, "Mystic " + d.name);
+                int v = RNG.nextInt(12);
+                String slot = SLOT_NAMES[i];
+                String cls = d.partClass.name().toLowerCase();
+                d = new Creature.Gene(slot + "_" + cls + "_" + v, d.partClass, "Mystic " + d.name, v);
             }
             child.genes[i] = new Creature.PartGenes(d, r1, r2);
         }
 
-        // Stats from class + slight inheritance
         child.maxHp = 30;
         child.speed = 30;
         child.skill = 30;
         child.morale = 30;
         applyClassBonus(child);
-        // Blend parent stats slightly
         child.maxHp = (child.maxHp + parentA.maxHp + parentB.maxHp) / 3;
         child.speed = (child.speed + parentA.speed + parentB.speed) / 3;
         child.skill = (child.skill + parentA.skill + parentB.skill) / 3;
         child.morale = (child.morale + parentA.morale + parentB.morale) / 3;
         child.hp = child.maxHp;
 
-        // Generate cards from dominant genes / class
         generateCardsFromGenes(child);
 
         parentA.breedCount++;
@@ -82,12 +76,14 @@ public class BreedingSystem {
     }
 
     private static Creature.Gene inheritGene(Creature.PartGenes a, Creature.PartGenes b) {
-        // Probabilities: D 37.5%, R1 9.375%, R2 3.125% from each parent -> normalize pick
-        // Simplified weighted pick from 6 genes
         float r = RNG.nextFloat();
         Creature.PartGenes src = RNG.nextBoolean() ? a : b;
-        if (r < 0.75f) return src.dominant.copy();       // ~37.5% each parent approx
-        if (r < 0.9375f) return src.recessive1.copy();   // ~9.375%
+        if (src == null) {
+            int v = RNG.nextInt(12);
+            return new Creature.Gene("eyes_beast_" + v, Creature.AxieClass.BEAST, "fallback", v);
+        }
+        if (r < 0.75f) return src.dominant.copy();
+        if (r < 0.9375f) return src.recessive1.copy();
         return src.recessive2.copy();
     }
 
