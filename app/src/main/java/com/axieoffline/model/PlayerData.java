@@ -8,10 +8,13 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class PlayerData {
 
     private static final String PREFS = "axie_offline_save";
+    private static final String[] SLOT_NAMES = {"eyes", "ears", "horn", "mouth", "back", "tail"};
+    private static final Random RNG = new Random();
 
     public int shards = 2000;
     public List<Creature> creatures = new ArrayList<>();
@@ -88,6 +91,27 @@ public class PlayerData {
         o.put("litter", c.litterId);
         o.put("isEgg", c.isEgg);
         o.put("eggMature", c.eggMatureTime);
+        if (c.genes != null) {
+            JSONArray garr = new JSONArray();
+            for (int i = 0; i < c.genes.length; i++) {
+                JSONObject g = new JSONObject();
+                if (c.genes[i] != null && c.genes[i].dominant != null) {
+                    g.put("d", c.genes[i].dominant.partId);
+                    g.put("dv", c.genes[i].dominant.variant);
+                    g.put("dc", c.genes[i].dominant.partClass.name());
+                    if (c.genes[i].recessive1 != null) {
+                        g.put("r1", c.genes[i].recessive1.partId);
+                        g.put("r1v", c.genes[i].recessive1.variant);
+                    }
+                    if (c.genes[i].recessive2 != null) {
+                        g.put("r2", c.genes[i].recessive2.partId);
+                        g.put("r2v", c.genes[i].recessive2.variant);
+                    }
+                }
+                garr.put(g);
+            }
+            o.put("genes", garr);
+        }
         return o;
     }
 
@@ -110,12 +134,36 @@ public class PlayerData {
         c.litterId = o.optString("litter", null);
         c.isEgg = o.optBoolean("isEgg", false);
         c.eggMatureTime = o.optLong("eggMature", 0);
-        // Regenerate genes/cards
+
         c.genes = new Creature.PartGenes[6];
+        JSONArray garr = o.optJSONArray("genes");
+        String cls = c.axieClass.name().toLowerCase();
         for (int i = 0; i < 6; i++) {
-            Creature.Gene d = new Creature.Gene("d" + i, c.axieClass, "Part");
+            int v = Math.abs((c.uid + i).hashCode()) % 12;
+            if (garr != null && i < garr.length()) {
+                JSONObject g = garr.getJSONObject(i);
+                if (g.has("d")) {
+                    int dv = g.optInt("dv", v);
+                    Creature.AxieClass dc = c.axieClass;
+                    try { dc = Creature.AxieClass.valueOf(g.optString("dc", c.axieClass.name())); } catch (Exception ignored) {}
+                    Creature.Gene d = new Creature.Gene(g.getString("d"), dc, "D", dv);
+                    Creature.Gene r1 = d.copy();
+                    Creature.Gene r2 = d.copy();
+                    if (g.has("r1")) {
+                        r1 = new Creature.Gene(g.getString("r1"), dc, "R1", g.optInt("r1v", dv));
+                    }
+                    if (g.has("r2")) {
+                        r2 = new Creature.Gene(g.getString("r2"), dc, "R2", g.optInt("r2v", dv));
+                    }
+                    c.genes[i] = new Creature.PartGenes(d, r1, r2);
+                    continue;
+                }
+            }
+            String slot = SLOT_NAMES[i];
+            Creature.Gene d = new Creature.Gene(slot + "_" + cls + "_" + v, c.axieClass, slot, v);
             c.genes[i] = new Creature.PartGenes(d, d.copy(), d.copy());
         }
+
         c.cards = new ArrayList<>();
         c.cards.add(new Creature.Card("h", "Horn", Creature.BodyPart.HORN, c.axieClass, 1, 60, 0, "attack"));
         c.cards.add(new Creature.Card("m", "Bite", Creature.BodyPart.MOUTH, c.axieClass, 1, 40, 0, "attack"));
