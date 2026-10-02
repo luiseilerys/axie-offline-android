@@ -21,7 +21,7 @@ jobs:
       - name: Decode and extract pre-generated body-part PNGs
         run: |
           mkdir -p app/src/main/res/drawable
-          base64 -d tools/all_parts.tar.gz.b64 | tar xz -C app/src/main/res/drawable
+          cat tools/chunk_00 tools/chunk_01 tools/chunk_02 tools/chunk_03 tools/chunk_04 | base64 -d | tar xz -C app/src/main/res/drawable
           echo "Extracted $(ls app/src/main/res/drawable | wc -l) PNGs"
 
       - name: Accept Android licenses & install packages
