@@ -18,16 +18,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
-
-      - name: Install Pillow
-        run: pip install Pillow
-
-      - name: Generate body-part PNGs
-        run: python tools/generate_parts.py
+      - name: Decode and extract pre-generated body-part PNGs
+        run: |
+          mkdir -p app/src/main/res/drawable
+          base64 -d tools/all_parts.tar.gz.b64 | tar xz -C app/src/main/res/drawable
+          echo "Extracted $(ls app/src/main/res/drawable | wc -l) PNGs"
 
       - name: Accept Android licenses & install packages
         run: |
